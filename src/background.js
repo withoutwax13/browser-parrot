@@ -178,7 +178,10 @@ function toRecorderStep(step) {
     selectors: selectorsForExport(step)
   };
 
-  if (type === 'change') out.value = step.input?.raw ?? '';
+  if (type === 'change') {
+    out.value = step.input?.raw ?? '';
+    out.valueMasked = !!step.input?.masked;
+  }
   return out;
 }
 
@@ -208,7 +211,18 @@ function fallbackActionLine(selectors, action) {
   return `  cy.get(${jsString(first)}).${action}();`;
 }
 
-function stepToCypressLines(step, index) {
+function looksSensitiveValue(step) {
+  if (step?.valueMasked) return true;
+  const joined = selectorList(step).join(' ').toLowerCase();
+  return /(password|passcode|otp|token|secret|apikey|api[_-]?key)/.test(joined);
+}
+
+function cypressTypeValue(step) {
+  if (looksSensitiveValue(step)) return "${Cypress.env('SECRET_VALUE') || 'REDACTED'}";
+  return String(step?.value ?? '');
+}
+
+function stepToCypressLines(step, index, prevStep) {
   const type = step?.type;
   const selectors = selectorList(step);
   const lines = [`  // Step ${index}: ${type || 'unknown'}`];
@@ -227,10 +241,16 @@ function stepToCypressLines(step, index) {
     return lines;
   }
 
+  const primary = selectors[0];
+  if (type === 'click' && prevStep?.type === 'click' && selectorList(prevStep)[0] === primary) {
+    lines.push('  // Deduped repeated click on same selector.');
+    return lines;
+  }
+
   if (selectors.length === 1) {
-    const sel = selectors[0];
+    const sel = primary;
     if (type === 'change') {
-      const value = step.value ?? '';
+      const value = cypressTypeValue(step);
       lines.push(`  cy.get(${jsString(sel)}).should('be.visible').clear().type(${jsString(value)});`);
       return lines;
     }
@@ -248,7 +268,7 @@ function stepToCypressLines(step, index) {
   lines.push(`    const picked = JSON.parse(selectors).find((s) => Cypress.$(s).length > 0);`);
   lines.push(`    expect(picked, 'at least one selector should exist').to.exist;`);
   if (type === 'change') {
-    const value = step.value ?? '';
+    const value = cypressTypeValue(step);
     lines.push(`    cy.get(picked).should('be.visible').clear().type(${jsString(value)});`);
   } else {
     lines.push(`    cy.get(picked).should('be.visible').click();`);
@@ -265,7 +285,8 @@ function scenarioToCypress(s, index = 1) {
 
   const steps = Array.isArray(s.steps) ? s.steps : [];
   steps.forEach((step, i) => {
-    lines.push(...stepToCypressLines(step, i + 1));
+    const prev = i > 0 ? steps[i - 1] : null;
+    lines.push(...stepToCypressLines(step, i + 1, prev));
   });
 
   if (!steps.length) {
