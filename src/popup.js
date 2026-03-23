@@ -48,14 +48,7 @@ function renderList(id, items) {
     li.textContent = t;
     ul.appendChild(li);
   });
-}
-
-function summarizeStep(step) {
-  const type = step?.type || step?.action || 'step';
-  if (type === 'navigate') return `navigate → ${step.url || ''}`;
-  const sel = step?.selectors?.[0]?.[0] || step?.element?.selectors?.[0]?.value || 'element';
-  const val = step?.value ? ` = ${step.value}` : '';
-  return `${type} → ${sel}${val}`;
+  ul.scrollTop = ul.scrollHeight;
 }
 
 async function refreshStatus() {
@@ -67,16 +60,12 @@ async function refreshStatus() {
   $('redactQuery').checked = !!res.redaction?.redactQuery;
   setVisualState(!!res.active);
 
-  const currentRaw = (res.steps || []).slice(-10).map((s) => {
+  const currentRaw = (res.steps || []).slice(-20).map((s) => {
     const sel = s?.element?.selectors?.[0]?.value || s?.element?.selectors?.[0] || 'element';
     const v = s?.input?.raw ? ` = ${s.input.raw}` : '';
     return `${s.action} → ${sel}${v}`;
   });
   renderList('liveStepsList', currentRaw);
-
-  const preview = await send({ type: 'export_session' });
-  const previewSteps = (preview?.steps || []).slice(0, 10).map(summarizeStep);
-  renderList('previewList', previewSteps);
 
   const scenarios = Array.isArray(res.scenarios) ? res.scenarios : [];
   const latest = scenarios[scenarios.length - 1] || null;

@@ -106,17 +106,19 @@ h1 { font-size: 17px; margin: 0; }
   border: 1px solid var(--line);
   color: #cfe0ff;
   border-radius: 10px;
-  padding: 10px;
+  padding: 8px 10px;
   font-size: 11px;
-  max-height: 180px;
-  overflow: auto;
+  white-space: normal;
+  word-break: break-word;
+  overflow-x: hidden;
 }
 
 .list {
   margin: 0;
   padding-left: 18px;
-  max-height: 180px;
-  overflow: auto;
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: hidden;
   font-size: 12px;
   line-height: 1.35;
 }
