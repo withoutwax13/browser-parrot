@@ -51,8 +51,8 @@ function humanStep(step) {
   return `${step.type || 'click'} → ${selector}`;
 }
 
-function renderSteps(listId, steps) {
-  const ul = $(listId);
+function renderSteps(steps) {
+  const ul = $('scenarioStepsList');
   ul.innerHTML = '';
   if (!steps.length) {
     const li = document.createElement('li');
@@ -104,19 +104,23 @@ function renderScenarios(scenarios, activeId) {
 function setMeta(s) {
   if (!s) {
     $('scenarioMeta').textContent = 'No scenario selected.';
-    renderSteps('scenarioStepsList', []);
+    $('renameInput').value = '';
+    renderSteps([]);
     return;
   }
+
+  $('renameInput').value = s.title || '';
 
   const lines = [
     `Title: ${s.title}`,
     `Started: ${fmt(s.started_at)}`,
     `Stopped: ${fmt(s.stopped_at)}`,
     `Steps: ${s.step_count}`,
-    `Network: ${s.network_count}`
-  ];
+    `Network: ${s.network_count}`,
+    s.rerun_of ? `Re-recorded from: ${s.rerun_of}` : ''
+  ].filter(Boolean);
   $('scenarioMeta').textContent = lines.join(' | ');
-  renderSteps('scenarioStepsList', s.steps || []);
+  renderSteps(s.steps || []);
 }
 
 async function refreshStatus() {
@@ -165,6 +169,24 @@ $('clearBtn').addEventListener('click', async () => {
   await refreshStatus();
 });
 
+$('renameBtn').addEventListener('click', async () => {
+  if (!selectedScenarioId) return;
+  await send({ type: 'rename_scenario', scenarioId: selectedScenarioId, title: $('renameInput').value.trim() });
+  await refreshStatus();
+});
+
+$('moveUpBtn').addEventListener('click', async () => {
+  if (!selectedScenarioId) return;
+  await send({ type: 'move_scenario', scenarioId: selectedScenarioId, direction: 'up' });
+  await refreshStatus();
+});
+
+$('moveDownBtn').addEventListener('click', async () => {
+  if (!selectedScenarioId) return;
+  await send({ type: 'move_scenario', scenarioId: selectedScenarioId, direction: 'down' });
+  await refreshStatus();
+});
+
 $('exportBtn').addEventListener('click', async () => {
   const res = await send({ type: 'export_session' });
   if (!res?.ok) return;
@@ -187,7 +209,11 @@ $('deleteBtn').addEventListener('click', async () => {
 
 $('rerecordBtn').addEventListener('click', async () => {
   if (!selectedScenarioId) return;
-  await send({ type: 'start_rerecord', scenarioId: selectedScenarioId });
+  await send({
+    type: 'start_rerecord',
+    scenarioId: selectedScenarioId,
+    replaceOriginal: !!$('replaceOnRerecord').checked
+  });
   await refreshStatus();
 });
 
@@ -195,8 +221,8 @@ $('openPanelBtn').addEventListener('click', async () => {
   await chrome.windows.create({
     url: chrome.runtime.getURL('src/popup.html?panel=1'),
     type: 'popup',
-    width: 480,
-    height: 860,
+    width: 500,
+    height: 900,
     focused: true
   });
 });

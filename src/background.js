@@ -55,6 +55,7 @@ function startScenario(title, opts = {}) {
     started_at: SH.nowIso(),
     stopped_at: null,
     rerun_of: opts.rerun_of || null,
+    replace_original_on_stop: !!opts.replace_original_on_stop,
     steps: [],
     network: []
   };
@@ -65,7 +66,16 @@ function startScenario(title, opts = {}) {
 
 function stopScenario() {
   const s = currentScenario();
-  if (s && !s.stopped_at) s.stopped_at = SH.nowIso();
+  if (!s) return;
+  if (!s.stopped_at) s.stopped_at = SH.nowIso();
+
+  if (s.rerun_of && s.replace_original_on_stop) {
+    state.scenarios = state.scenarios.filter((x) => x.id !== s.rerun_of);
+    // keep current scenario selected
+    state.currentScenarioId = s.id;
+    s.rerun_of = null;
+    s.replace_original_on_stop = false;
+  }
 }
 
 function correlate(step, scenario) {
@@ -191,6 +201,17 @@ function buildRecorderExportAll() {
   };
 }
 
+function moveScenario(scenarioId, direction) {
+  const idx = state.scenarios.findIndex((s) => s.id === scenarioId);
+  if (idx < 0) return false;
+  const next = direction === 'up' ? idx - 1 : idx + 1;
+  if (next < 0 || next >= state.scenarios.length) return false;
+  const tmp = state.scenarios[idx];
+  state.scenarios[idx] = state.scenarios[next];
+  state.scenarios[next] = tmp;
+  return true;
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg) return;
 
@@ -248,11 +269,32 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     if (state.active) stopScenario();
-    startScenario(src.title, { rerun_of: src.id });
+    startScenario(src.title, {
+      rerun_of: src.id,
+      replace_original_on_stop: !!msg.replaceOriginal
+    });
     state.active = true;
     ensureInjectedAllTabs();
     broadcast({ type: 'set_discovery_mode', active: true });
     sendResponse?.({ ok: true, active: true, currentScenarioId: state.currentScenarioId });
+    return true;
+  }
+
+  if (msg.type === 'rename_scenario') {
+    const s = getScenarioById(msg.scenarioId);
+    const title = scenarioTitleFrom(msg.title);
+    if (!s) {
+      sendResponse?.({ ok: false, error: 'scenario_not_found' });
+      return true;
+    }
+    s.title = title;
+    sendResponse?.({ ok: true });
+    return true;
+  }
+
+  if (msg.type === 'move_scenario') {
+    const moved = moveScenario(msg.scenarioId, msg.direction);
+    sendResponse?.({ ok: true, moved });
     return true;
   }
 

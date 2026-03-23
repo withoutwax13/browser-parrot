@@ -34,8 +34,15 @@
 
     <section class="card mt10">
       <div class="sectionTitle">Selected Scenario</div>
-      <div id="scenarioMeta" class="meta">No scenario selected.</div>
+      <div class="row">
+        <input id="renameInput" class="input" placeholder="Scenario title" />
+        <button id="renameBtn" class="btn">Rename</button>
+      </div>
+      <label class="check mt8"><input type="checkbox" id="replaceOnRerecord" /> Replace original on re-record</label>
+      <div id="scenarioMeta" class="meta mt8">No scenario selected.</div>
       <div class="row mt8">
+        <button id="moveUpBtn" class="btn">↑</button>
+        <button id="moveDownBtn" class="btn">↓</button>
         <button id="rerecordBtn" class="btn">Re-record</button>
         <button id="exportSelectedBtn" class="btn">Export Selected</button>
         <button id="deleteBtn" class="btn btn-danger">Delete</button>
