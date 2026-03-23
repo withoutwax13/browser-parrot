@@ -14,14 +14,12 @@ const state = {
   currentScenarioId: null
 };
 
-function activeTabId(cb) {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => cb(tabs?.[0]?.id));
-}
-
 function broadcast(msg) {
-  activeTabId((tabId) => {
-    if (!tabId) return;
-    chrome.tabs.sendMessage(tabId, msg, () => void chrome.runtime.lastError);
+  chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] }, (tabs) => {
+    (tabs || []).forEach((tab) => {
+      if (!tab?.id) return;
+      chrome.tabs.sendMessage(tab.id, msg, () => void chrome.runtime.lastError);
+    });
   });
 }
 
