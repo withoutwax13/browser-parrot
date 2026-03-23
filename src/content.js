@@ -8,7 +8,14 @@
   let discoveryActive = false;
 
   function send(type, payload) {
-    chrome.runtime.sendMessage({ source: 'content', type, payload });
+    chrome.runtime.sendMessage({ source: 'content', type, payload }, () => void chrome.runtime.lastError);
+  }
+
+  function syncState() {
+    chrome.runtime.sendMessage({ type: 'get_state' }, (res) => {
+      if (chrome.runtime.lastError) return;
+      if (res && typeof res.active === 'boolean') discoveryActive = res.active;
+    });
   }
 
   function elementMeta(el) {
@@ -101,4 +108,7 @@
       return true;
     }
   });
+
+  syncState();
+  setInterval(syncState, 1000);
 })();
