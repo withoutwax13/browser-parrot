@@ -1,0 +1,6 @@
+body { font-family: Inter, Arial, sans-serif; width: 340px; padding: 12px; }
+h1 { font-size: 16px; margin: 0 0 8px; }
+.row { display: flex; gap: 8px; margin-bottom: 8px; }
+button { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid #c9d1d9; cursor: pointer; }
+.toggles { display: grid; gap: 6px; margin: 8px 0; font-size: 12px; }
+pre { background: #f6f8fa; border-radius: 8px; padding: 8px; font-size: 11px; max-height: 120px; overflow: auto; }

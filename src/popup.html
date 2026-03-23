@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Browser Parrot</title>
+    <link rel="stylesheet" href="../styles/popup.css" />
+  </head>
+  <body>
+    <h1>Browser Parrot</h1>
+    <div class="row">
+      <button id="startBtn">Start Discovery</button>
+      <button id="stopBtn">Stop Discovery</button>
+    </div>
+    <div class="row">
+      <button id="exportBtn">Export JSON</button>
+      <button id="clearBtn">Clear Session</button>
+    </div>
+    <div class="toggles">
+      <label><input type="checkbox" id="maskPasswords" checked /> Mask passwords</label>
+      <label><input type="checkbox" id="redactHeaders" checked /> Redact sensitive headers</label>
+      <label><input type="checkbox" id="redactQuery" checked /> Redact query secrets</label>
+    </div>
+    <pre id="status">idle</pre>
+    <script src="popup.js"></script>
+  </body>
+</html>
