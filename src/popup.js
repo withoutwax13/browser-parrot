@@ -34,9 +34,28 @@ function setVisualState(active) {
   }
 }
 
+function summarizeStep(step) {
+  const action = step?.action || 'unknown';
+  const name = step?.element?.name || step?.element?.id || step?.element?.tag || 'element';
+  const url = step?.url_after || step?.url_before || '';
+  return { action, target: name, url };
+}
+
+function prettyPreview(raw, simple, latestSteps) {
+  const simpleScenario = simple?.scenarios?.[simple.scenarios.length - 1] || null;
+  return {
+    mode: $('exportMode').value,
+    scenarioCount: raw?.scenarios?.length || 0,
+    latestScenario: raw?.scenarios?.[raw.scenarios.length - 1]?.title || null,
+    latestStepCount: latestSteps.length,
+    simplePreviewTopSteps: (simpleScenario?.steps || []).slice(0, 6),
+  };
+}
+
 async function refreshStatus() {
   const res = await send({ type: 'get_state' });
   if (!res?.ok) return;
+
   $('maskPasswords').checked = !!res.redaction?.maskPasswords;
   $('redactHeaders').checked = !!res.redaction?.redactHeaders;
   $('redactQuery').checked = !!res.redaction?.redactQuery;
@@ -44,6 +63,12 @@ async function refreshStatus() {
 
   const scenarios = Array.isArray(res.scenarios) ? res.scenarios : [];
   const latest = scenarios[scenarios.length - 1] || null;
+
+  const raw = await send({ type: 'export_session', format: 'raw' });
+  const simple = await send({ type: 'export_session', format: 'simple' });
+
+  const latestScenarioRaw = raw?.scenarios?.[raw.scenarios.length - 1] || null;
+  const latestSteps = (latestScenarioRaw?.steps || []).slice(-8).map(summarizeStep);
 
   $('status').textContent = JSON.stringify(
     {
@@ -57,6 +82,12 @@ async function refreshStatus() {
     null,
     2
   );
+
+  $('liveSteps').textContent = latestSteps.length
+    ? JSON.stringify(latestSteps, null, 2)
+    : 'No steps captured yet.';
+
+  $('preview').textContent = JSON.stringify(prettyPreview(raw, simple, latestSteps), null, 2);
 }
 
 async function setMode(active) {
@@ -91,13 +122,13 @@ $('openPanelBtn').addEventListener('click', async () => {
   await chrome.windows.create({
     url: chrome.runtime.getURL('src/popup.html?panel=1'),
     type: 'popup',
-    width: 420,
-    height: 700,
+    width: 460,
+    height: 820,
     focused: true
   });
 });
 
-['maskPasswords', 'redactHeaders', 'redactQuery'].forEach((id) => {
+['maskPasswords', 'redactHeaders', 'redactQuery', 'exportMode'].forEach((id) => {
   $(id).addEventListener('change', async () => {
     const redaction = {
       maskPasswords: $('maskPasswords').checked,

@@ -1,4 +1,7 @@
 (() => {
+  if (window.__browserParrotInitialized) return;
+  window.__browserParrotInitialized = true;
+
   const SH = self.BrowserParrotShared;
   if (!SH) return;
 
@@ -50,6 +53,8 @@
   function onAction(action, e, extra = {}) {
     if (!discoveryActive) return;
     const el = e.target;
+    if (!el || !el.tagName) return;
+
     const valueRaw = 'value' in el ? String(el.value ?? '') : null;
     const sensitive = inferSensitive(el);
     const value = sensitive ? '***' : SH.safeString(valueRaw || '', 300);

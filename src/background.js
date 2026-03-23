@@ -23,6 +23,19 @@ function broadcast(msg) {
   });
 }
 
+function ensureInjectedAllTabs() {
+  chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] }, (tabs) => {
+    (tabs || []).forEach((tab) => {
+      if (!tab?.id) return;
+      chrome.scripting.executeScript(
+        { target: { tabId: tab.id }, files: ['src/shared.js', 'src/content.js'] },
+        () => void chrome.runtime.lastError
+      );
+    });
+  });
+}
+
+
 function currentScenario() {
   return state.scenarios.find((s) => s.id === state.currentScenarioId) || null;
 }
@@ -170,7 +183,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'set_discovery_mode') {
     if (typeof msg.active === 'boolean') {
-      if (msg.active && !state.active) startScenario(msg.title);
+      if (msg.active && !state.active) { startScenario(msg.title); ensureInjectedAllTabs(); }
       if (!msg.active && state.active) stopScenario();
       state.active = msg.active;
     }
