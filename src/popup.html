@@ -6,21 +6,33 @@
     <link rel="stylesheet" href="../styles/popup.css" />
   </head>
   <body>
-    <h1>Browser Parrot</h1>
-    <div class="row">
-      <button id="startBtn">Start Discovery</button>
-      <button id="stopBtn">Stop Discovery</button>
+    <header class="header">
+      <div>
+        <h1>Browser Parrot</h1>
+        <p class="subtitle">QA discovery recorder</p>
+      </div>
+      <span id="modePill" class="pill idle">Idle</span>
+    </header>
+
+    <button id="toggleBtn" class="btn btn-primary">Start Discovery</button>
+
+    <div class="row mt8">
+      <button id="exportBtn" class="btn">Export JSON</button>
+      <button id="clearBtn" class="btn">Clear</button>
     </div>
-    <div class="row">
-      <button id="exportBtn">Export JSON</button>
-      <button id="clearBtn">Clear Session</button>
-    </div>
-    <div class="toggles">
-      <label><input type="checkbox" id="maskPasswords" checked /> Mask passwords</label>
-      <label><input type="checkbox" id="redactHeaders" checked /> Redact sensitive headers</label>
-      <label><input type="checkbox" id="redactQuery" checked /> Redact query secrets</label>
-    </div>
-    <pre id="status">idle</pre>
+
+    <button id="openPanelBtn" class="btn btn-ghost mt8">Open floating controls</button>
+
+    <section class="card mt10">
+      <div class="sectionTitle">Redaction</div>
+      <div class="toggles">
+        <label><input type="checkbox" id="maskPasswords" checked /> Mask passwords</label>
+        <label><input type="checkbox" id="redactHeaders" checked /> Redact sensitive headers</label>
+        <label><input type="checkbox" id="redactQuery" checked /> Redact query secrets</label>
+      </div>
+    </section>
+
+    <pre id="status" class="status"></pre>
     <script src="popup.js"></script>
   </body>
 </html>

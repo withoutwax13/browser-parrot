@@ -84,7 +84,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'set_discovery_mode') {
-    state.active = !!msg.active;
+    if (typeof msg.active === 'boolean') state.active = msg.active;
     if (msg.clear) {
       state.steps = [];
       state.network = [];
