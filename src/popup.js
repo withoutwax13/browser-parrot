@@ -34,22 +34,28 @@ function setVisualState(active) {
   }
 }
 
-function summarizeStep(step) {
-  const action = step?.action || 'unknown';
-  const name = step?.element?.name || step?.element?.id || step?.element?.tag || 'element';
-  const url = step?.url_after || step?.url_before || '';
-  return { action, target: name, url };
+function renderList(id, items) {
+  const ul = $(id);
+  ul.innerHTML = '';
+  if (!items.length) {
+    const li = document.createElement('li');
+    li.textContent = 'No steps yet.';
+    ul.appendChild(li);
+    return;
+  }
+  items.forEach((t) => {
+    const li = document.createElement('li');
+    li.textContent = t;
+    ul.appendChild(li);
+  });
 }
 
-function prettyPreview(raw, simple, latestSteps) {
-  const simpleScenario = simple?.scenarios?.[simple.scenarios.length - 1] || null;
-  return {
-    mode: $('exportMode').value,
-    scenarioCount: raw?.scenarios?.length || 0,
-    latestScenario: raw?.scenarios?.[raw.scenarios.length - 1]?.title || null,
-    latestStepCount: latestSteps.length,
-    simplePreviewTopSteps: (simpleScenario?.steps || []).slice(0, 6),
-  };
+function summarizeStep(step) {
+  const type = step?.type || step?.action || 'step';
+  if (type === 'navigate') return `navigate → ${step.url || ''}`;
+  const sel = step?.selectors?.[0]?.[0] || step?.element?.selectors?.[0]?.value || 'element';
+  const val = step?.value ? ` = ${step.value}` : '';
+  return `${type} → ${sel}${val}`;
 }
 
 async function refreshStatus() {
@@ -61,33 +67,20 @@ async function refreshStatus() {
   $('redactQuery').checked = !!res.redaction?.redactQuery;
   setVisualState(!!res.active);
 
+  const currentRaw = (res.steps || []).slice(-10).map((s) => {
+    const sel = s?.element?.selectors?.[0]?.value || s?.element?.selectors?.[0] || 'element';
+    const v = s?.input?.raw ? ` = ${s.input.raw}` : '';
+    return `${s.action} → ${sel}${v}`;
+  });
+  renderList('liveStepsList', currentRaw);
+
+  const preview = await send({ type: 'export_session' });
+  const previewSteps = (preview?.steps || []).slice(0, 10).map(summarizeStep);
+  renderList('previewList', previewSteps);
+
   const scenarios = Array.isArray(res.scenarios) ? res.scenarios : [];
   const latest = scenarios[scenarios.length - 1] || null;
-
-  const raw = await send({ type: 'export_session', format: 'raw' });
-  const simple = await send({ type: 'export_session', format: 'simple' });
-
-  const latestScenarioRaw = raw?.scenarios?.[raw.scenarios.length - 1] || null;
-  const latestSteps = (latestScenarioRaw?.steps || []).slice(-8).map(summarizeStep);
-
-  $('status').textContent = JSON.stringify(
-    {
-      active: res.active,
-      scenarios: scenarios.length,
-      current: latest
-        ? { title: latest.title, step_count: latest.step_count, network_count: latest.network_count }
-        : null,
-      redaction: res.redaction
-    },
-    null,
-    2
-  );
-
-  $('liveSteps').textContent = latestSteps.length
-    ? JSON.stringify(latestSteps, null, 2)
-    : 'No steps captured yet.';
-
-  $('preview').textContent = JSON.stringify(prettyPreview(raw, simple, latestSteps), null, 2);
+  $('status').textContent = `active: ${!!res.active} | scenarios: ${scenarios.length} | current: ${latest?.title || '-'} | steps: ${latest?.step_count || 0}`;
 }
 
 async function setMode(active) {
@@ -112,10 +105,9 @@ $('clearBtn').addEventListener('click', async () => {
 });
 
 $('exportBtn').addEventListener('click', async () => {
-  const format = $('exportMode').value;
-  const res = await send({ type: 'export_session', format });
+  const res = await send({ type: 'export_session' });
   if (!res?.ok) return;
-  downloadJson(`browser-parrot-${format}-${Date.now()}.json`, res);
+  downloadJson(`browser-parrot-recorder-${Date.now()}.json`, res);
 });
 
 $('openPanelBtn').addEventListener('click', async () => {
@@ -128,7 +120,7 @@ $('openPanelBtn').addEventListener('click', async () => {
   });
 });
 
-['maskPasswords', 'redactHeaders', 'redactQuery', 'exportMode'].forEach((id) => {
+['maskPasswords', 'redactHeaders', 'redactQuery'].forEach((id) => {
   $(id).addEventListener('change', async () => {
     const redaction = {
       maskPasswords: $('maskPasswords').checked,

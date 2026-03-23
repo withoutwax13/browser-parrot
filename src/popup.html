@@ -21,15 +21,11 @@
     </section>
 
     <div class="row mt8">
-      <button id="exportBtn" class="btn">Export JSON</button>
+      <button id="exportBtn" class="btn">Export</button>
       <button id="clearBtn" class="btn">Clear</button>
     </div>
 
     <div class="row mt8">
-      <select id="exportMode" class="select">
-        <option value="simple">Simple export</option>
-        <option value="raw">Raw export</option>
-      </select>
       <button id="openPanelBtn" class="btn btn-ghost">Open floating controls</button>
     </div>
 
@@ -43,13 +39,13 @@
     </section>
 
     <section class="card mt10">
-      <div class="sectionTitle">Live capture (latest steps)</div>
-      <pre id="liveSteps" class="status"></pre>
+      <div class="sectionTitle">Live capture</div>
+      <ul id="liveStepsList" class="list"></ul>
     </section>
 
     <section class="card mt10">
       <div class="sectionTitle">Export preview</div>
-      <pre id="preview" class="status"></pre>
+      <ul id="previewList" class="list"></ul>
     </section>
 
     <pre id="status" class="status"></pre>

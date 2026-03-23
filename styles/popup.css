@@ -111,3 +111,14 @@ h1 { font-size: 17px; margin: 0; }
   max-height: 180px;
   overflow: auto;
 }
+
+.list {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.list li { margin: 4px 0; color: #d7e3ff; }

@@ -35,15 +35,13 @@ function ensureInjectedAllTabs() {
   });
 }
 
-
 function currentScenario() {
   return state.scenarios.find((s) => s.id === state.currentScenarioId) || null;
 }
 
 function scenarioTitleFrom(input) {
   const t = (input || '').trim();
-  if (t) return t;
-  return `Scenario ${state.scenarios.length + 1}`;
+  return t || `Scenario ${state.scenarios.length + 1}`;
 }
 
 function startScenario(title) {
@@ -90,6 +88,38 @@ function shapedStep(raw, scenario) {
   return out;
 }
 
+function isNoisy(step) {
+  if (!step?.action) return true;
+  if (step.action === 'focus') return true;
+  const tag = String(step.element?.tag || '').toLowerCase();
+  if (tag === 'html' || tag === 'body') return true;
+  return false;
+}
+
+function selectorKey(step) {
+  const arr = step?.element?.selectors;
+  if (!Array.isArray(arr) || !arr.length) return '';
+  const s = arr[0];
+  return typeof s === 'string' ? s : (s?.value || '');
+}
+
+function pushStepWithDedupe(step, scenario) {
+  if (isNoisy(step)) return;
+  const list = scenario.steps;
+  const prev = list[list.length - 1];
+
+  if (prev && step.action === 'input' && prev.action === 'input') {
+    const sameTarget = selectorKey(step) && selectorKey(step) === selectorKey(prev);
+    const dt = new Date(step.ts).getTime() - new Date(prev.ts).getTime();
+    if (sameTarget && dt <= 2000) {
+      list[list.length - 1] = step;
+      return;
+    }
+  }
+
+  list.push(step);
+}
+
 function pushNetwork(payload = {}) {
   const s = currentScenario();
   if (!s) return;
@@ -105,19 +135,20 @@ function pushNetwork(payload = {}) {
   });
 }
 
-function summarize() {
-  const steps = state.scenarios.reduce((n, s) => n + s.steps.length, 0);
-  const network = state.scenarios.reduce((n, s) => n + s.network.length, 0);
-  return {
-    scenario_count: state.scenarios.length,
-    step_count: steps,
-    network_count: network
-  };
+function selectorsForExport(step) {
+  const sels = Array.isArray(step?.element?.selectors) ? step.element.selectors : [];
+  const out = [];
+  for (const s of sels) {
+    const value = typeof s === 'string' ? s : s?.value;
+    if (!value) continue;
+    out.push([String(value)]);
+    if (out.length >= 4) break;
+  }
+  return out;
 }
 
-function toSimpleStep(step) {
-  const action = step.action || 'click';
-  if (action === 'navigation') {
+function toRecorderStep(step) {
+  if (step.action === 'navigation') {
     return {
       type: 'navigate',
       url: step.url_after || step.url_before || '',
@@ -125,32 +156,22 @@ function toSimpleStep(step) {
     };
   }
 
-  const selectors = Array.isArray(step.element?.selectors)
-    ? step.element.selectors.map((s) => (Array.isArray(s) ? s : [String(s)])).slice(0, 4)
-    : [];
-
-  const base = {
-    type: action === 'input' ? 'change' : (action || 'click'),
+  const type = step.action === 'input' ? 'change' : (step.action || 'click');
+  const out = {
+    type,
     target: 'main',
-    selectors
+    selectors: selectorsForExport(step)
   };
 
-  if (base.type === 'change') {
-    base.value = step.input?.raw ?? '';
-  }
-  return base;
+  if (type === 'change') out.value = step.input?.raw ?? '';
+  return out;
 }
 
-function toSimpleExport() {
+function buildRecorderExport() {
+  const s = currentScenario() || state.scenarios[state.scenarios.length - 1] || null;
   return {
-    title: 'Browser Parrot Export',
-    exported_at: SH.nowIso(),
-    scenarios: state.scenarios.map((s) => ({
-      title: s.title,
-      started_at: s.started_at,
-      stopped_at: s.stopped_at,
-      steps: s.steps.map(toSimpleStep)
-    }))
+    title: s?.title || 'Browser Parrot Recording',
+    steps: s ? s.steps.map(toRecorderStep) : []
   };
 }
 
@@ -161,7 +182,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const s = currentScenario();
     if (!s) return true;
     const step = shapedStep(msg.payload || {}, s);
-    s.steps.push(step);
+    pushStepWithDedupe(step, s);
     sendResponse?.({ ok: true });
     return true;
   }
@@ -170,7 +191,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const s = currentScenario();
     if (!s) return true;
     const step = shapedStep(msg.payload || {}, s);
-    s.steps.push(step);
+    pushStepWithDedupe(step, s);
     sendResponse?.({ ok: true });
     return true;
   }
@@ -183,7 +204,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'set_discovery_mode') {
     if (typeof msg.active === 'boolean') {
-      if (msg.active && !state.active) { startScenario(msg.title); ensureInjectedAllTabs(); }
+      if (msg.active && !state.active) {
+        startScenario(msg.title);
+        ensureInjectedAllTabs();
+      }
       if (!msg.active && state.active) stopScenario();
       state.active = msg.active;
     }
@@ -230,22 +254,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'export_session') {
-    if (msg.format === 'simple') {
-      sendResponse?.({ ok: true, ...toSimpleExport() });
-      return true;
-    }
-
-    const summary = summarize();
-    sendResponse?.({
-      ok: true,
-      exported_at: SH.nowIso(),
-      meta: {
-        ...summary,
-        window_ms: NETWORK_WINDOW_MS,
-        redaction: state.redaction
-      },
-      scenarios: state.scenarios
-    });
+    sendResponse?.({ ok: true, ...buildRecorderExport() });
     return true;
   }
 
