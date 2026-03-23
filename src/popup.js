@@ -18,6 +18,17 @@ function downloadJson(name, data) {
   URL.revokeObjectURL(url);
 }
 
+
+function downloadText(name, text) {
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function setVisualState(active) {
   const toggleBtn = $('toggleBtn');
   const modePill = $('modePill');
@@ -193,12 +204,28 @@ $('exportBtn').addEventListener('click', async () => {
   downloadJson(`browser-parrot-all-scenarios-${Date.now()}.json`, res);
 });
 
+
+$('exportCypressBtn').addEventListener('click', async () => {
+  const res = await send({ type: 'export_cypress' });
+  if (!res?.ok) return;
+  downloadText(`browser-parrot-all-scenarios-${Date.now()}.cy.js`, res.script || '');
+});
+
 $('exportSelectedBtn').addEventListener('click', async () => {
   if (!selectedScenarioId) return;
   const res = await send({ type: 'export_scenario', scenarioId: selectedScenarioId });
   if (!res?.ok) return;
   const safeTitle = (res.title || 'scenario').replace(/[^a-z0-9-_]+/gi, '_').toLowerCase();
   downloadJson(`browser-parrot-${safeTitle}-${Date.now()}.json`, res);
+});
+
+
+$('exportSelectedCypressBtn').addEventListener('click', async () => {
+  if (!selectedScenarioId) return;
+  const res = await send({ type: 'export_cypress_scenario', scenarioId: selectedScenarioId });
+  if (!res?.ok) return;
+  const safeTitle = (res.title || 'scenario').replace(/[^a-z0-9-_]+/gi, '_').toLowerCase();
+  downloadText(`browser-parrot-${safeTitle}-${Date.now()}.cy.js`, res.script || '');
 });
 
 $('deleteBtn').addEventListener('click', async () => {

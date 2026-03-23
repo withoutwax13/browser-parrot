@@ -182,6 +182,57 @@ function toRecorderStep(step) {
   return out;
 }
 
+
+function jsString(v) {
+  return JSON.stringify(v == null ? '' : String(v));
+}
+
+function bestSelector(step) {
+  const selectors = selectorsForExport(step);
+  return selectors?.[0]?.[0] || 'body';
+}
+
+function scenarioToCypress(s, index = 1) {
+  const lines = [];
+  const safeTitle = (s.title || `Scenario ${index}`).replace(/'/g, "\'");
+  lines.push(`it('${safeTitle}', () => {`);
+  for (const step of (s.steps || [])) {
+    const type = step.type;
+    if (type === 'navigate') {
+      const url = step.url || '';
+      if (url) lines.push(`  cy.visit(${jsString(url)});`);
+      continue;
+    }
+
+    const selector = bestSelector(step);
+    if (type === 'change') {
+      lines.push(`  cy.get(${jsString(selector)}).clear().type(${jsString(step.value ?? '')});`);
+      continue;
+    }
+
+    if (type === 'click') {
+      lines.push(`  cy.get(${jsString(selector)}).click();`);
+      continue;
+    }
+
+    // fallback for unknown actions
+    lines.push(`  // Unsupported recorded action: ${type || 'unknown'}`);
+    lines.push(`  cy.get(${jsString(selector)}).click();`);
+  }
+  lines.push('});');
+  return lines.join('\n');
+}
+
+function buildCypressForScenarios(scenarios) {
+  const body = scenarios.map((s, i) => scenarioToCypress(s, i + 1)).join('\n\n');
+  return [
+    "describe('Browser Parrot generated flow', () => {",
+    body || "  it('empty recording', () => {});",
+    '});',
+    ''
+  ].join('\n');
+}
+
 function scenarioExportShape(s) {
   return {
     id: s.id,
@@ -353,6 +404,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'export_session') {
     sendResponse?.({ ok: true, ...buildRecorderExportAll() });
+    return true;
+  }
+
+
+  if (msg.type === 'export_cypress') {
+    const script = buildCypressForScenarios(state.scenarios.map(scenarioExportShape));
+    sendResponse?.({ ok: true, title: 'all-scenarios', script });
+    return true;
+  }
+
+  if (msg.type === 'export_cypress_scenario') {
+    const s = getScenarioById(msg.scenarioId);
+    if (!s) {
+      sendResponse?.({ ok: false, error: 'scenario_not_found' });
+      return true;
+    }
+    const shaped = scenarioExportShape(s);
+    const script = buildCypressForScenarios([shaped]);
+    sendResponse?.({ ok: true, title: s.title, script });
     return true;
   }
 
