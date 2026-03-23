@@ -10,8 +10,8 @@ const state = {
     redactHeaders: true,
     redactQuery: true
   },
-  steps: [],
-  network: []
+  scenarios: [],
+  currentScenarioId: null
 };
 
 function activeTabId(cb) {
@@ -25,15 +25,44 @@ function broadcast(msg) {
   });
 }
 
-function correlate(step) {
+function currentScenario() {
+  return state.scenarios.find((s) => s.id === state.currentScenarioId) || null;
+}
+
+function scenarioTitleFrom(input) {
+  const t = (input || '').trim();
+  if (t) return t;
+  return `Scenario ${state.scenarios.length + 1}`;
+}
+
+function startScenario(title) {
+  const scenario = {
+    id: SH.uid('scenario'),
+    title: scenarioTitleFrom(title),
+    started_at: SH.nowIso(),
+    stopped_at: null,
+    steps: [],
+    network: []
+  };
+  state.scenarios.push(scenario);
+  state.currentScenarioId = scenario.id;
+  return scenario;
+}
+
+function stopScenario() {
+  const s = currentScenario();
+  if (s && !s.stopped_at) s.stopped_at = SH.nowIso();
+}
+
+function correlate(step, scenario) {
   const t = new Date(step.ts).getTime();
-  return state.network.filter((n) => {
+  return (scenario?.network || []).filter((n) => {
     const nt = new Date(n.ts).getTime();
     return nt >= t && nt <= t + NETWORK_WINDOW_MS;
   });
 }
 
-function shapedStep(raw) {
+function shapedStep(raw, scenario) {
   const out = {
     id: raw.step_id || SH.uid('step'),
     ts: raw.ts || SH.nowIso(),
@@ -46,94 +75,171 @@ function shapedStep(raw) {
     dom_after: raw.dom_after || null,
     network: []
   };
-  out.network = correlate(out);
+  out.network = correlate(out, scenario);
   return out;
+}
+
+function pushNetwork(payload = {}) {
+  const s = currentScenario();
+  if (!s) return;
+  s.network.push({
+    ts: payload.ts || SH.nowIso(),
+    method: payload.method || 'GET',
+    url: SH.sanitizeUrl(payload.url || ''),
+    status: payload.status || 0,
+    type: payload.type || 'xhr',
+    duration_ms: payload.duration_ms || null,
+    request_headers: state.redaction.redactHeaders ? SH.parseHeaders(payload.request_headers) : (payload.request_headers || {}),
+    response_headers: state.redaction.redactHeaders ? SH.parseHeaders(payload.response_headers) : (payload.response_headers || {})
+  });
+}
+
+function summarize() {
+  const steps = state.scenarios.reduce((n, s) => n + s.steps.length, 0);
+  const network = state.scenarios.reduce((n, s) => n + s.network.length, 0);
+  return {
+    scenario_count: state.scenarios.length,
+    step_count: steps,
+    network_count: network
+  };
+}
+
+function toSimpleStep(step) {
+  const action = step.action || 'click';
+  if (action === 'navigation') {
+    return {
+      type: 'navigate',
+      url: step.url_after || step.url_before || '',
+      assertedEvents: [{ type: 'navigation', url: step.url_after || step.url_before || '' }]
+    };
+  }
+
+  const selectors = Array.isArray(step.element?.selectors)
+    ? step.element.selectors.map((s) => (Array.isArray(s) ? s : [String(s)])).slice(0, 4)
+    : [];
+
+  const base = {
+    type: action === 'input' ? 'change' : (action || 'click'),
+    target: 'main',
+    selectors
+  };
+
+  if (base.type === 'change') {
+    base.value = step.input?.raw ?? '';
+  }
+  return base;
+}
+
+function toSimpleExport() {
+  return {
+    title: 'Browser Parrot Export',
+    exported_at: SH.nowIso(),
+    scenarios: state.scenarios.map((s) => ({
+      title: s.title,
+      started_at: s.started_at,
+      stopped_at: s.stopped_at,
+      steps: s.steps.map(toSimpleStep)
+    }))
+  };
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg) return;
 
   if (msg.type === 'ui_event' && state.active) {
-    const step = shapedStep(msg.payload || {});
-    state.steps.push(step);
+    const s = currentScenario();
+    if (!s) return true;
+    const step = shapedStep(msg.payload || {}, s);
+    s.steps.push(step);
     sendResponse?.({ ok: true });
     return true;
   }
 
   if (msg.type === 'url_change' && state.active) {
-    const step = shapedStep(msg.payload || {});
-    state.steps.push(step);
+    const s = currentScenario();
+    if (!s) return true;
+    const step = shapedStep(msg.payload || {}, s);
+    s.steps.push(step);
     sendResponse?.({ ok: true });
     return true;
   }
 
   if (msg.type === 'devtools_network' && state.active) {
-    const p = msg.payload || {};
-    state.network.push({
-      ts: p.ts || SH.nowIso(),
-      method: p.method || 'GET',
-      url: SH.sanitizeUrl(p.url || ''),
-      status: p.status || 0,
-      type: p.type || 'xhr',
-      duration_ms: p.duration_ms || null,
-      request_headers: state.redaction.redactHeaders ? SH.parseHeaders(p.request_headers) : (p.request_headers || {}),
-      response_headers: state.redaction.redactHeaders ? SH.parseHeaders(p.response_headers) : (p.response_headers || {})
-    });
+    pushNetwork(msg.payload || {});
     sendResponse?.({ ok: true });
     return true;
   }
 
   if (msg.type === 'set_discovery_mode') {
-    if (typeof msg.active === 'boolean') state.active = msg.active;
-    if (msg.clear) {
-      state.steps = [];
-      state.network = [];
+    if (typeof msg.active === 'boolean') {
+      if (msg.active && !state.active) startScenario(msg.title);
+      if (!msg.active && state.active) stopScenario();
+      state.active = msg.active;
     }
+
     if (msg.redaction) state.redaction = { ...state.redaction, ...msg.redaction };
+
+    if (msg.clear) {
+      state.scenarios = [];
+      state.currentScenarioId = null;
+      state.active = false;
+    }
+
     broadcast({ type: 'set_discovery_mode', active: state.active });
     sendResponse?.({ ok: true, active: state.active, redaction: state.redaction });
     return true;
   }
 
   if (msg.type === 'clear_session') {
-    state.steps = [];
-    state.network = [];
+    state.scenarios = [];
+    state.currentScenarioId = null;
+    state.active = false;
     sendResponse?.({ ok: true });
     return true;
   }
 
   if (msg.type === 'get_state') {
-    sendResponse?.({ ok: true, active: state.active, redaction: state.redaction, steps: state.steps, networkCount: state.network.length });
+    const s = currentScenario();
+    sendResponse?.({
+      ok: true,
+      active: state.active,
+      redaction: state.redaction,
+      steps: s?.steps || [],
+      networkCount: s?.network?.length || 0,
+      scenarios: state.scenarios.map((x) => ({
+        id: x.id,
+        title: x.title,
+        started_at: x.started_at,
+        stopped_at: x.stopped_at,
+        step_count: x.steps.length,
+        network_count: x.network.length
+      }))
+    });
     return true;
   }
 
   if (msg.type === 'export_session') {
+    if (msg.format === 'simple') {
+      sendResponse?.({ ok: true, ...toSimpleExport() });
+      return true;
+    }
+
+    const summary = summarize();
     sendResponse?.({
       ok: true,
       exported_at: SH.nowIso(),
       meta: {
-        step_count: state.steps.length,
-        network_count: state.network.length,
+        ...summary,
         window_ms: NETWORK_WINDOW_MS,
         redaction: state.redaction
       },
-      steps: state.steps
+      scenarios: state.scenarios
     });
     return true;
   }
 
   if (msg.type === 'ingest_network_event' && state.active) {
-    const ev = msg.payload || {};
-    state.network.push({
-      ts: ev.ts || SH.nowIso(),
-      method: ev.method || 'GET',
-      url: SH.sanitizeUrl(ev.url || ''),
-      status: ev.status || 0,
-      type: ev.type || 'xhr',
-      duration_ms: ev.duration_ms || null,
-      request_headers: state.redaction.redactHeaders ? SH.parseHeaders(ev.request_headers) : ev.request_headers,
-      response_headers: state.redaction.redactHeaders ? SH.parseHeaders(ev.response_headers) : ev.response_headers
-    });
+    pushNetwork(msg.payload || {});
     sendResponse?.({ ok: true });
     return true;
   }
@@ -143,10 +249,10 @@ chrome.webRequest.onCompleted.addListener(
   (details) => {
     if (!state.active) return;
     if (details.tabId < 0) return;
-    state.network.push({
+    pushNetwork({
       ts: SH.nowIso(),
       method: details.method,
-      url: SH.sanitizeUrl(details.url),
+      url: details.url,
       status: details.statusCode,
       type: details.type,
       duration_ms: null

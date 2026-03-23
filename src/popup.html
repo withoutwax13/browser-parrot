@@ -14,14 +14,24 @@
       <span id="modePill" class="pill idle">Idle</span>
     </header>
 
-    <button id="toggleBtn" class="btn btn-primary">Start Discovery</button>
+    <section class="card">
+      <div class="sectionTitle">Scenario</div>
+      <input id="scenarioTitle" class="input" placeholder="e.g. Upload document flow" />
+      <button id="toggleBtn" class="btn btn-primary mt8">Start Discovery</button>
+    </section>
 
     <div class="row mt8">
       <button id="exportBtn" class="btn">Export JSON</button>
       <button id="clearBtn" class="btn">Clear</button>
     </div>
 
-    <button id="openPanelBtn" class="btn btn-ghost mt8">Open floating controls</button>
+    <div class="row mt8">
+      <select id="exportMode" class="select">
+        <option value="simple">Simple export</option>
+        <option value="raw">Raw export</option>
+      </select>
+      <button id="openPanelBtn" class="btn btn-ghost">Open floating controls</button>
+    </div>
 
     <section class="card mt10">
       <div class="sectionTitle">Redaction</div>

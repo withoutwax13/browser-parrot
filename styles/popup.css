@@ -7,14 +7,13 @@
   --primary: #4f7cff;
   --danger: #ff5b6e;
   --ghost: #223055;
-  --ok: #1fbf75;
 }
 
 * { box-sizing: border-box; }
 
 body {
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  width: 360px;
+  width: 380px;
   padding: 12px;
   margin: 0;
   color: var(--text);
@@ -70,7 +69,7 @@ h1 { font-size: 17px; margin: 0; }
   border-color: #ff7c8b;
 }
 
-.btn-ghost { background: var(--ghost); color: #d7e3ff; width: 100%; }
+.btn-ghost { background: var(--ghost); color: #d7e3ff; }
 
 .card {
   border: 1px solid var(--line);
@@ -78,7 +77,26 @@ h1 { font-size: 17px; margin: 0; }
   border-radius: 10px;
   padding: 10px;
 }
-.sectionTitle { font-size: 12px; color: var(--muted); margin-bottom: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.sectionTitle {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 7px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.input,
+.select {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #0f1730;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
 .toggles { display: grid; gap: 8px; font-size: 12px; }
 .toggles label { display: flex; gap: 8px; align-items: center; }
 
@@ -90,6 +108,6 @@ h1 { font-size: 17px; margin: 0; }
   border-radius: 10px;
   padding: 10px;
   font-size: 11px;
-  max-height: 160px;
+  max-height: 180px;
   overflow: auto;
 }

@@ -41,11 +41,17 @@ async function refreshStatus() {
   $('redactHeaders').checked = !!res.redaction?.redactHeaders;
   $('redactQuery').checked = !!res.redaction?.redactQuery;
   setVisualState(!!res.active);
+
+  const scenarios = Array.isArray(res.scenarios) ? res.scenarios : [];
+  const latest = scenarios[scenarios.length - 1] || null;
+
   $('status').textContent = JSON.stringify(
     {
       active: res.active,
-      steps: res.steps?.length || 0,
-      network: res.networkCount,
+      scenarios: scenarios.length,
+      current: latest
+        ? { title: latest.title, step_count: latest.step_count, network_count: latest.network_count }
+        : null,
       redaction: res.redaction
     },
     null,
@@ -59,7 +65,8 @@ async function setMode(active) {
     redactHeaders: $('redactHeaders').checked,
     redactQuery: $('redactQuery').checked
   };
-  await send({ type: 'set_discovery_mode', active, redaction });
+  const title = $('scenarioTitle').value.trim();
+  await send({ type: 'set_discovery_mode', active, redaction, title });
   await refreshStatus();
 }
 
@@ -74,9 +81,10 @@ $('clearBtn').addEventListener('click', async () => {
 });
 
 $('exportBtn').addEventListener('click', async () => {
-  const res = await send({ type: 'export_session' });
+  const format = $('exportMode').value;
+  const res = await send({ type: 'export_session', format });
   if (!res?.ok) return;
-  downloadJson(`browser-parrot-${Date.now()}.json`, res);
+  downloadJson(`browser-parrot-${format}-${Date.now()}.json`, res);
 });
 
 $('openPanelBtn').addEventListener('click', async () => {
