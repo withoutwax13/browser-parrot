@@ -13,7 +13,7 @@
 
 body {
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  width: 380px;
+  width: 400px;
   padding: 12px;
   margin: 0;
   color: var(--text);
@@ -69,6 +69,12 @@ h1 { font-size: 17px; margin: 0; }
   border-color: #ff7c8b;
 }
 
+.btn-danger {
+  background: #3a1c28;
+  border-color: #7e2a3a;
+  color: #ffd4db;
+}
+
 .btn-ghost { background: var(--ghost); color: #d7e3ff; }
 
 .card {
@@ -86,8 +92,7 @@ h1 { font-size: 17px; margin: 0; }
   letter-spacing: .04em;
 }
 
-.input,
-.select {
+.input {
   width: 100%;
   border: 1px solid var(--line);
   background: #0f1730;
@@ -99,6 +104,59 @@ h1 { font-size: 17px; margin: 0; }
 
 .toggles { display: grid; gap: 8px; font-size: 12px; }
 .toggles label { display: flex; gap: 8px; align-items: center; }
+
+.scenarioList {
+  display: grid;
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.scenarioItem {
+  text-align: left;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0f1730;
+  color: var(--text);
+  padding: 8px;
+  cursor: pointer;
+}
+.scenarioItem.selected {
+  border-color: #6f95ff;
+  background: #17254b;
+}
+
+.scenarioTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.scenarioTitle {
+  font-size: 13px;
+  font-weight: 600;
+}
+.scenarioCount {
+  font-size: 11px;
+  color: #bfd0ff;
+}
+.scenarioMetaLine {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.scenarioEmpty {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.meta {
+  font-size: 12px;
+  color: #d7e3ff;
+  line-height: 1.45;
+  white-space: normal;
+  word-break: break-word;
+}
 
 .status {
   margin: 10px 0 0;
@@ -123,4 +181,8 @@ h1 { font-size: 17px; margin: 0; }
   line-height: 1.35;
 }
 
-.list li { margin: 4px 0; color: #d7e3ff; }
+.list li {
+  margin: 4px 0;
+  color: #d7e3ff;
+  word-break: break-word;
+}

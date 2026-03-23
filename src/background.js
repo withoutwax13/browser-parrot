@@ -39,17 +39,22 @@ function currentScenario() {
   return state.scenarios.find((s) => s.id === state.currentScenarioId) || null;
 }
 
+function getScenarioById(id) {
+  return state.scenarios.find((s) => s.id === id) || null;
+}
+
 function scenarioTitleFrom(input) {
   const t = (input || '').trim();
   return t || `Scenario ${state.scenarios.length + 1}`;
 }
 
-function startScenario(title) {
+function startScenario(title, opts = {}) {
   const scenario = {
     id: SH.uid('scenario'),
     title: scenarioTitleFrom(title),
     started_at: SH.nowIso(),
     stopped_at: null,
+    rerun_of: opts.rerun_of || null,
     steps: [],
     network: []
   };
@@ -167,11 +172,22 @@ function toRecorderStep(step) {
   return out;
 }
 
-function buildRecorderExport() {
-  const s = currentScenario() || state.scenarios[state.scenarios.length - 1] || null;
+function scenarioExportShape(s) {
   return {
-    title: s?.title || 'Browser Parrot Recording',
-    steps: s ? s.steps.map(toRecorderStep) : []
+    id: s.id,
+    title: s.title,
+    started_at: s.started_at,
+    stopped_at: s.stopped_at,
+    step_count: s.steps.length,
+    steps: s.steps.map(toRecorderStep)
+  };
+}
+
+function buildRecorderExportAll() {
+  return {
+    title: 'Browser Parrot Recording',
+    exported_at: SH.nowIso(),
+    scenarios: state.scenarios.map(scenarioExportShape)
   };
 }
 
@@ -225,6 +241,43 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === 'start_rerecord') {
+    const src = getScenarioById(msg.scenarioId);
+    if (!src) {
+      sendResponse?.({ ok: false, error: 'scenario_not_found' });
+      return true;
+    }
+    if (state.active) stopScenario();
+    startScenario(src.title, { rerun_of: src.id });
+    state.active = true;
+    ensureInjectedAllTabs();
+    broadcast({ type: 'set_discovery_mode', active: true });
+    sendResponse?.({ ok: true, active: true, currentScenarioId: state.currentScenarioId });
+    return true;
+  }
+
+  if (msg.type === 'select_scenario') {
+    const s = getScenarioById(msg.scenarioId);
+    if (!s) {
+      sendResponse?.({ ok: false, error: 'scenario_not_found' });
+      return true;
+    }
+    state.currentScenarioId = s.id;
+    sendResponse?.({ ok: true, currentScenarioId: s.id });
+    return true;
+  }
+
+  if (msg.type === 'delete_scenario') {
+    const before = state.scenarios.length;
+    state.scenarios = state.scenarios.filter((s) => s.id !== msg.scenarioId);
+    const deleted = state.scenarios.length < before;
+    if (state.currentScenarioId === msg.scenarioId) {
+      state.currentScenarioId = state.scenarios.length ? state.scenarios[state.scenarios.length - 1].id : null;
+    }
+    sendResponse?.({ ok: true, deleted, currentScenarioId: state.currentScenarioId });
+    return true;
+  }
+
   if (msg.type === 'clear_session') {
     state.scenarios = [];
     state.currentScenarioId = null;
@@ -238,6 +291,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse?.({
       ok: true,
       active: state.active,
+      currentScenarioId: state.currentScenarioId,
       redaction: state.redaction,
       steps: s?.steps || [],
       networkCount: s?.network?.length || 0,
@@ -246,15 +300,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         title: x.title,
         started_at: x.started_at,
         stopped_at: x.stopped_at,
+        rerun_of: x.rerun_of,
         step_count: x.steps.length,
-        network_count: x.network.length
+        network_count: x.network.length,
+        steps: x.steps.map(toRecorderStep)
       }))
     });
     return true;
   }
 
   if (msg.type === 'export_session') {
-    sendResponse?.({ ok: true, ...buildRecorderExport() });
+    sendResponse?.({ ok: true, ...buildRecorderExportAll() });
+    return true;
+  }
+
+  if (msg.type === 'export_scenario') {
+    const s = getScenarioById(msg.scenarioId);
+    if (!s) {
+      sendResponse?.({ ok: false, error: 'scenario_not_found' });
+      return true;
+    }
+    sendResponse?.({ ok: true, ...scenarioExportShape(s) });
     return true;
   }
 

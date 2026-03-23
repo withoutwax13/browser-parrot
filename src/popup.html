@@ -15,19 +15,33 @@
     </header>
 
     <section class="card">
-      <div class="sectionTitle">Scenario</div>
+      <div class="sectionTitle">Quick Record</div>
       <input id="scenarioTitle" class="input" placeholder="e.g. Upload document flow" />
       <button id="toggleBtn" class="btn btn-primary mt8">Start Discovery</button>
+      <div class="row mt8">
+        <button id="exportBtn" class="btn">Export All</button>
+        <button id="clearBtn" class="btn">Clear All</button>
+      </div>
+      <div class="row mt8">
+        <button id="openPanelBtn" class="btn btn-ghost">Open floating controls</button>
+      </div>
     </section>
 
-    <div class="row mt8">
-      <button id="exportBtn" class="btn">Export</button>
-      <button id="clearBtn" class="btn">Clear</button>
-    </div>
+    <section class="card mt10">
+      <div class="sectionTitle">Scenarios</div>
+      <div id="scenarioList" class="scenarioList"></div>
+    </section>
 
-    <div class="row mt8">
-      <button id="openPanelBtn" class="btn btn-ghost">Open floating controls</button>
-    </div>
+    <section class="card mt10">
+      <div class="sectionTitle">Selected Scenario</div>
+      <div id="scenarioMeta" class="meta">No scenario selected.</div>
+      <div class="row mt8">
+        <button id="rerecordBtn" class="btn">Re-record</button>
+        <button id="exportSelectedBtn" class="btn">Export Selected</button>
+        <button id="deleteBtn" class="btn btn-danger">Delete</button>
+      </div>
+      <ul id="scenarioStepsList" class="list mt8"></ul>
+    </section>
 
     <section class="card mt10">
       <div class="sectionTitle">Redaction</div>
@@ -36,11 +50,6 @@
         <label><input type="checkbox" id="redactHeaders" checked /> Redact sensitive headers</label>
         <label><input type="checkbox" id="redactQuery" checked /> Redact query secrets</label>
       </div>
-    </section>
-
-    <section class="card mt10">
-      <div class="sectionTitle">Live capture</div>
-      <ul id="liveStepsList" class="list"></ul>
     </section>
 
     <div id="status" class="status"></div>
