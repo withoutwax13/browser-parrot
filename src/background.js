@@ -183,42 +183,95 @@ function toRecorderStep(step) {
 }
 
 
+
 function jsString(v) {
   return JSON.stringify(v == null ? '' : String(v));
 }
 
-function bestSelector(step) {
-  const selectors = selectorsForExport(step);
-  return selectors?.[0]?.[0] || 'body';
+function selectorList(step) {
+  const selectors = Array.isArray(step?.selectors) ? step.selectors : [];
+  const flat = [];
+  for (const pair of selectors) {
+    const value = Array.isArray(pair) ? pair[0] : pair;
+    if (!value) continue;
+    flat.push(String(value));
+  }
+  return flat.slice(0, 4);
+}
+
+function safeTestTitle(v) {
+  return (v || 'Scenario').replace(/\\/g, '\\\\').replace(/'/g, "\'");
+}
+
+function fallbackActionLine(selectors, action) {
+  const first = selectors[0] || 'body';
+  return `  cy.get(${jsString(first)}).${action}();`;
+}
+
+function stepToCypressLines(step, index) {
+  const type = step?.type;
+  const selectors = selectorList(step);
+  const lines = [`  // Step ${index}: ${type || 'unknown'}`];
+
+  if (type === 'navigate') {
+    const url = step.url || '';
+    if (url) {
+      lines.push(`  cy.visit(${jsString(url)});`);
+      lines.push(`  cy.location('href', { timeout: 15000 }).should('include', ${jsString(url)});`);
+    }
+    return lines;
+  }
+
+  if (!selectors.length) {
+    lines.push('  // No selector captured; manual fix may be required.');
+    return lines;
+  }
+
+  if (selectors.length === 1) {
+    const sel = selectors[0];
+    if (type === 'change') {
+      const value = step.value ?? '';
+      lines.push(`  cy.get(${jsString(sel)}).should('be.visible').clear().type(${jsString(value)});`);
+      return lines;
+    }
+    if (type === 'click') {
+      lines.push(`  cy.get(${jsString(sel)}).should('be.visible').click();`);
+      return lines;
+    }
+    lines.push(`  // Unsupported recorded action: ${type || 'unknown'}; fallback to click.`);
+    lines.push(`  cy.get(${jsString(sel)}).should('be.visible').click();`);
+    return lines;
+  }
+
+  lines.push(`  cy.then(() => {`);
+  lines.push(`    const selectors = ${jsString(JSON.stringify(selectors))};`);
+  lines.push(`    const picked = JSON.parse(selectors).find((s) => Cypress.$(s).length > 0);`);
+  lines.push(`    expect(picked, 'at least one selector should exist').to.exist;`);
+  if (type === 'change') {
+    const value = step.value ?? '';
+    lines.push(`    cy.get(picked).should('be.visible').clear().type(${jsString(value)});`);
+  } else {
+    lines.push(`    cy.get(picked).should('be.visible').click();`);
+  }
+  lines.push(`  });`);
+  return lines;
 }
 
 function scenarioToCypress(s, index = 1) {
   const lines = [];
-  const safeTitle = (s.title || `Scenario ${index}`).replace(/'/g, "\'");
+  const safeTitle = safeTestTitle(s.title || `Scenario ${index}`);
   lines.push(`it('${safeTitle}', () => {`);
-  for (const step of (s.steps || [])) {
-    const type = step.type;
-    if (type === 'navigate') {
-      const url = step.url || '';
-      if (url) lines.push(`  cy.visit(${jsString(url)});`);
-      continue;
-    }
+  lines.push('  cy.viewport(1280, 720);');
 
-    const selector = bestSelector(step);
-    if (type === 'change') {
-      lines.push(`  cy.get(${jsString(selector)}).clear().type(${jsString(step.value ?? '')});`);
-      continue;
-    }
+  const steps = Array.isArray(s.steps) ? s.steps : [];
+  steps.forEach((step, i) => {
+    lines.push(...stepToCypressLines(step, i + 1));
+  });
 
-    if (type === 'click') {
-      lines.push(`  cy.get(${jsString(selector)}).click();`);
-      continue;
-    }
-
-    // fallback for unknown actions
-    lines.push(`  // Unsupported recorded action: ${type || 'unknown'}`);
-    lines.push(`  cy.get(${jsString(selector)}).click();`);
+  if (!steps.length) {
+    lines.push('  // No steps captured for this scenario.');
   }
+
   lines.push('});');
   return lines.join('\n');
 }
@@ -227,6 +280,10 @@ function buildCypressForScenarios(scenarios) {
   const body = scenarios.map((s, i) => scenarioToCypress(s, i + 1)).join('\n\n');
   return [
     "describe('Browser Parrot generated flow', () => {",
+    "  beforeEach(() => {",
+    "    Cypress.on('uncaught:exception', () => false);",
+    "  });",
+    '',
     body || "  it('empty recording', () => {});",
     '});',
     ''
